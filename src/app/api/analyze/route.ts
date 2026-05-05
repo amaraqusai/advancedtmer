@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { image, referenceAllowed, referenceRejected } = await request.json();
+    const { image, mode, referenceAllowed, referenceRejected } = await request.json();
 
     if (!image) {
       return NextResponse.json({ error: 'No image provided.' }, { status: 400 });
@@ -23,21 +23,40 @@ export async function POST(request: NextRequest) {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Build the multimodal prompt
+    const isScreen = mode === 'screen';
     const promptParts: (string | { inlineData: { data: string; mimeType: string } })[] = [
       `You are an AI study supervisor. Your job is to determine if the "Current Image" shows the student studying or working.
       
-      Criteria for STUDYING:
+      ${isScreen ? `
+      CONTEXT: This is a screenshot of the student's COMPUTER SCREEN.
+      
+      Criteria for STUDYING (Screen):
+      - Educational websites (e.g., Moodle, university portals, research papers).
+      - SPECIFICALLY ALLOWED: Haifa University portal (huids.haifa.ac.il), slides, or academic PDF/documents.
+      - Programming IDEs (VS Code, etc.), design tools, or document editors (Word, Excel) if they look like work.
+      - Search queries related to learning or technical problems.
+      
+      Criteria for NOT STUDYING (Screen):
+      - Video games (e.g., Steam, Fortnite, Minecraft, or casual web games).
+      - Social media (Facebook, Instagram, TikTok, etc.) unless clearly for work.
+      - Streaming entertainment (Netflix, YouTube entertainment videos).
+      - Clear non-work/non-study browsing.
+      ` : `
+      CONTEXT: This is a photo of the student from their WEBCAM.
+      
+      Criteria for STUDYING (Webcam):
       - Student is present in the frame.
       - Student is looking at a computer screen, books, or writing.
       - Student appears focused and engaged with study materials.
       
-      Criteria for NOT STUDYING:
+      Criteria for NOT STUDYING (Webcam):
       - Student is missing from the frame (empty chair).
       - Student is sleeping or has eyes closed.
-      - Student is clearly using a phone for entertainment (not as a tool).
+      - Student is clearly using a phone for entertainment.
       - Student is looking away from their work for an extended period.
+      `}
       
-      Use your general knowledge of study behavior to decide.`,
+      Use your general knowledge of study behavior and screen content to decide.`,
     ];
 
     if (referenceAllowed) {

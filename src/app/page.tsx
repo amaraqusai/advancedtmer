@@ -41,9 +41,9 @@ export default function Home() {
   const [isActive, setIsActive] = useState(false);
   const [time, setTime] = useState(0); 
   
-  const [trackingMode, setTrackingMode] = useState<'camera' | 'manual'>(() => {
+  const [trackingMode, setTrackingMode] = useState<'camera' | 'manual' | 'screen'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('trackingMode') as 'camera' | 'manual') || 'camera';
+      return (localStorage.getItem('trackingMode') as 'camera' | 'manual' | 'screen') || 'camera';
     }
     return 'camera';
   });
@@ -52,6 +52,10 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{success: boolean, message: string} | null>(null);
   const [studyLog, setStudyLog] = useState<LogEntry[]>([]);
+  
+  // Screen Capture Stream
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   
   // Reference Photos
   const [refAllowed, setRefAllowed] = useState<string | null>(() => {
@@ -122,9 +126,45 @@ export default function Home() {
     alert("Verification missed! Timer stopped.");
   }, [addLogEntry, formatTime, time]);
 
+  const startScreenShare = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      setScreenStream(stream);
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = stream;
+      }
+      stream.getVideoTracks()[0].onended = () => {
+        setScreenStream(null);
+      };
+    } catch (err) {
+      console.error("Error sharing screen:", err);
+      alert("Failed to share screen. Please try again.");
+    }
+  };
+
+  const stopScreenShare = () => {
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+      setScreenStream(null);
+    }
+  };
+
   const captureAndVerify = useCallback(async () => {
-    if (!webcamRef.current) return;
-    const imageSrc = webcamRef.current.getScreenshot();
+    let imageSrc: string | null = null;
+
+    if (trackingMode === 'camera' && webcamRef.current) {
+      imageSrc = webcamRef.current.getScreenshot();
+    } else if (trackingMode === 'screen' && screenVideoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = screenVideoRef.current.videoWidth;
+      canvas.height = screenVideoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(screenVideoRef.current, 0, 0, canvas.width, canvas.height);
+        imageSrc = canvas.toDataURL('image/jpeg');
+      }
+    }
+
     if (!imageSrc) return;
 
     setIsAnalyzing(true);
@@ -136,6 +176,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           image: imageSrc,
+          mode: trackingMode,
           referenceAllowed: refAllowed,
           referenceRejected: refRejected
         }),
@@ -159,7 +200,7 @@ export default function Home() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [webcamRef, refAllowed, refRejected, time, addLogEntry, formatTime]);
+  }, [webcamRef, refAllowed, refRejected, time, addLogEntry, formatTime, trackingMode]);
 
   const handleManualVerify = useCallback(() => {
     addLogEntry('verified', formatTime(time));
@@ -179,15 +220,16 @@ export default function Home() {
     }
   }, [fetchGroup, user?.groupId]);
 
-  // Auto-capture in camera mode when modal opens
+  // Auto-capture in camera/screen mode when modal opens
   useEffect(() => {
-    if (showVerification && trackingMode === 'camera' && !isAnalyzing && !verificationResult) {
+    const isAutoMode = trackingMode === 'camera' || (trackingMode === 'screen' && screenStream);
+    if (showVerification && isAutoMode && !isAnalyzing && !verificationResult) {
       const timer = setTimeout(() => {
         captureAndVerify();
-      }, 2000); // Wait 2s for camera to warm up then auto-capture
+      }, 2000); 
       return () => clearTimeout(timer);
     }
-  }, [showVerification, trackingMode, isAnalyzing, verificationResult, captureAndVerify]);
+  }, [showVerification, trackingMode, screenStream, isAnalyzing, verificationResult, captureAndVerify]);
 
   // Periodic Leaderboard Sync
   useEffect(() => {
@@ -332,17 +374,36 @@ export default function Home() {
           <select 
             value={trackingMode} 
             onChange={(e) => {
-              const mode = e.target.value as 'camera' | 'manual';
+              const mode = e.target.value as 'camera' | 'manual' | 'screen';
               setTrackingMode(mode);
               localStorage.setItem('trackingMode', mode);
+              if (mode !== 'screen') stopScreenShare();
             }}
             disabled={isActive}
             style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--card-border)', background: 'var(--background)', color: 'var(--foreground)' }}
           >
             <option value="camera">AI Camera (ML Verification)</option>
+            <option value="screen">Screen Supervision (Active Screen)</option>
             <option value="manual">Manual Button (Check-in)</option>
           </select>
         </label>
+        
+        {trackingMode === 'screen' && (
+          <div style={{ width: '100%', marginBottom: '0.5rem' }}>
+            {!screenStream ? (
+              <button className="primary" onClick={startScreenShare} style={{ width: '100%' }}>
+                Start Screen Sharing
+              </button>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--success)', fontSize: '0.9rem', fontWeight: 600 }}>
+                <CheckCircle2 size={16} /> Screen Sharing Active
+                <button onClick={stopScreenShare} style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}>Stop</button>
+              </div>
+            )}
+            <video ref={screenVideoRef} autoPlay playsInline muted style={{ display: 'none' }} />
+          </div>
+        )}
+
         <label>
           Check Every (Minutes)
           <input type="number" min="1" value={intervalMinutes} onChange={(e) => setIntervalMinutes(Math.max(1, parseInt(e.target.value) || 1))} disabled={isActive} />
@@ -455,6 +516,29 @@ export default function Home() {
                   {isAnalyzing ? <><Loader2 className="spinner" size={20} /> AI is deciding...</> : <><Camera size={20} /> Capture Now</>}
                 </button>
                 {!isAnalyzing && !verificationResult && <p style={{ fontSize: '0.8rem', marginTop: '-0.5rem' }}>Auto-capturing in a moment...</p>}
+              </>
+            ) : trackingMode === 'screen' ? (
+              <>
+                <div className="webcam-container" style={{ marginTop: '1rem', background: '#222' }}>
+                  {screenStream ? (
+                    <video 
+                      autoPlay 
+                      playsInline 
+                      muted 
+                      ref={(el) => {
+                        if (el && screenStream) el.srcObject = screenStream;
+                      }}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <div style={{ color: '#666' }}>Screen sharing not active</div>
+                  )}
+                </div>
+                <button className="primary" onClick={captureAndVerify} disabled={isAnalyzing || (verificationResult?.success) || !screenStream} style={{ width: '100%', marginBottom: '1rem' }}>
+                  {isAnalyzing ? <><Loader2 className="spinner" size={20} /> AI Scanning Screen...</> : <><History size={20} /> Scan Screen Now</>}
+                </button>
+                {!isAnalyzing && !verificationResult && screenStream && <p style={{ fontSize: '0.8rem', marginTop: '-0.5rem' }}>Scanning in a moment...</p>}
+                {!screenStream && <p style={{ color: 'var(--danger)', fontSize: '0.8rem' }}>Please enable screen sharing in settings</p>}
               </>
             ) : (
               <div style={{ margin: '2rem 0' }}>
