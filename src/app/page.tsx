@@ -35,6 +35,13 @@ export default function Home() {
   
   const [isActive, setIsActive] = useState(false);
   const [time, setTime] = useState(0); 
+  const timeRef = useRef(0);
+  
+  // Keep timeRef in sync with time state
+  useEffect(() => {
+    timeRef.current = time;
+  }, [time]);
+
   const [currentGoal, setCurrentGoal] = useState('');
   
   const [trackingMode, setTrackingMode] = useState<'camera' | 'manual' | 'screen'>('camera');
@@ -107,11 +114,11 @@ export default function Home() {
   }, []);
 
   const handleMissedVerification = useCallback(() => {
-    addLogEntry('missed', formatTime(time));
+    addLogEntry('missed', formatTime(timeRef.current));
     setIsActive(false);
     setShowVerification(false);
     alert("Verification missed! Timer stopped.");
-  }, [addLogEntry, formatTime, time]);
+  }, [addLogEntry, formatTime]);
 
   const startScreenShare = async () => {
     try {
@@ -139,11 +146,19 @@ export default function Home() {
   const captureAndVerify = useCallback(async (isSilent = false) => {
     let imageSrc: string | null = null;
 
+    if (isSilent) {
+      console.log(`[Scan] Background scan attempt at ${new Date().toLocaleTimeString()}...`);
+      setLastScanTime(new Date().toLocaleTimeString());
+    } else {
+      setIsAnalyzing(true);
+      setVerificationResult(null);
+    }
+
     if (trackingMode === 'camera' && webcamRef.current) {
       imageSrc = webcamRef.current.getScreenshot();
     } else if (trackingMode === 'screen' && screenVideoRef.current) {
       const video = screenVideoRef.current;
-      console.log(`[Scan] Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
+      console.log(`[Scan] Video dimensions: ${video.videoWidth}x${video.videoHeight}, ReadyState: ${video.readyState}`);
       
       if (video.videoWidth > 0 && video.videoHeight > 0) {
         const canvas = document.createElement('canvas');
@@ -155,21 +170,15 @@ export default function Home() {
           imageSrc = canvas.toDataURL('image/jpeg');
         }
       } else {
-        console.warn("[Scan] Video not ready yet (0 dimensions)");
+        console.warn("[Scan] Video not ready yet (0 dimensions). Ensure screen share is active.");
       }
+    } else {
+      console.warn(`[Scan] Missing ref for mode ${trackingMode}. Camera: ${!!webcamRef.current}, ScreenVideo: ${!!screenVideoRef.current}`);
     }
 
     if (!imageSrc) {
-      console.warn("[Scan] No image captured, skipping scan.");
+      console.warn("[Scan] No image captured, skipping API call.");
       return;
-    }
-
-    if (isSilent) {
-      console.log("[Scan] Background scan triggered...");
-      setLastScanTime(new Date().toLocaleTimeString());
-    } else {
-      setIsAnalyzing(true);
-      setVerificationResult(null);
     }
 
     try {
@@ -189,7 +198,7 @@ export default function Home() {
       if (response.ok && data.isStudying) {
         if (!isSilent) {
           setVerificationResult({ success: true, message: data.reason || 'Verified!' });
-          addLogEntry('verified', formatTime(time));
+          addLogEntry('verified', formatTime(timeRef.current));
           setTimeout(() => {
             setShowVerification(false);
             setVerificationResult(null);
@@ -200,7 +209,7 @@ export default function Home() {
       } else {
         if (!isSilent) {
           setVerificationResult({ success: false, message: data.reason || data.error || 'Not studying.' });
-          addLogEntry('failed', formatTime(time));
+          addLogEntry('failed', formatTime(timeRef.current));
         } else {
           // Silent Background Ping!
           setLastNudge(data.reason || "Hey! It looks like you're off track. Let's get back to work!");
@@ -215,16 +224,16 @@ export default function Home() {
     } finally {
       if (!isSilent) setIsAnalyzing(false);
     }
-  }, [webcamRef, refAllowed, refRejected, time, addLogEntry, formatTime, trackingMode, currentGoal]);
+  }, [webcamRef, refAllowed, refRejected, addLogEntry, formatTime, trackingMode, currentGoal]);
 
   const handleManualVerify = useCallback(() => {
-    addLogEntry('verified', formatTime(time));
+    addLogEntry('verified', formatTime(timeRef.current));
     setVerificationResult({ success: true, message: "Manual check-in confirmed!" });
     setTimeout(() => {
       setShowVerification(false);
       setVerificationResult(null);
     }, 1500);
-  }, [addLogEntry, formatTime, time]);
+  }, [addLogEntry, formatTime]);
 
   // Load Initial Data
   useEffect(() => {
