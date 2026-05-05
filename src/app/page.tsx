@@ -276,11 +276,22 @@ export default function Home() {
         });
       }, 1000);
 
-      // Background "Digital Body Double" Scanning (Every 2 minutes)
+      // Background "Digital Body Double" Scanning
       if (trackingMode === 'screen' && screenStream) {
+        // Initial scan after 5 seconds
+        const initialScan = setTimeout(() => {
+          captureAndVerify(true);
+        }, 5000);
+
         bgScanInterval = setInterval(() => {
           captureAndVerify(true);
         }, 60000); // 1 minute background scan
+        
+        return () => {
+          if (interval) clearInterval(interval);
+          if (bgScanInterval) clearInterval(bgScanInterval);
+          clearTimeout(initialScan);
+        };
       }
     }
     return () => { 
@@ -410,10 +421,26 @@ export default function Home() {
           style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '2px solid var(--primary)', textAlign: 'center', fontSize: '1.1rem', fontWeight: 500 }}
         />
         <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', opacity: 0.7 }}>The AI will monitor your {trackingMode === 'screen' ? 'screen' : 'camera'} specifically for this goal.</p>
-        {lastScanTime && trackingMode !== 'manual' && (
-          <p style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600 }}>
-            Digital Body Double is active. Last scan: {lastScanTime}
+        
+        {isActive && trackingMode === 'screen' && !screenStream && (
+          <p style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 700 }}>
+            ⚠️ ACTION REQUIRED: Click "Start Screen Sharing" below to enable AI monitoring!
           </p>
+        )}
+
+        {isActive && (trackingMode === 'screen' || trackingMode === 'camera') && (
+          <div style={{ marginTop: '0.5rem' }}>
+            {!lastScanTime ? (
+              <p style={{ fontSize: '0.7rem', color: 'var(--primary)', fontStyle: 'italic' }}>
+                <Loader2 size={12} className="spinner" style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                Initializing Digital Body Double... (First scan in 5s)
+              </p>
+            ) : (
+              <p style={{ fontSize: '0.7rem', color: 'var(--success)', fontWeight: 700 }}>
+                ● Digital Body Double Active. Last scan: {lastScanTime}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
