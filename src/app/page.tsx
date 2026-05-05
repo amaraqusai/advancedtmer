@@ -43,6 +43,7 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{success: boolean, message: string} | null>(null);
   const [studyLog, setStudyLog] = useState<LogEntry[]>([]);
+  const [lastNudge, setLastNudge] = useState<string | null>(null);
   
   // Screen Capture Stream
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -134,7 +135,7 @@ export default function Home() {
     }
   };
 
-  const captureAndVerify = useCallback(async () => {
+  const captureAndVerify = useCallback(async (isSilent = false) => {
     let imageSrc: string | null = null;
 
     if (trackingMode === 'camera' && webcamRef.current) {
@@ -152,8 +153,10 @@ export default function Home() {
 
     if (!imageSrc) return;
 
-    setIsAnalyzing(true);
-    setVerificationResult(null);
+    if (!isSilent) {
+      setIsAnalyzing(true);
+      setVerificationResult(null);
+    }
 
     try {
       const response = await fetch('/api/analyze', {
@@ -170,21 +173,33 @@ export default function Home() {
 
       const data = await response.json();
       if (response.ok && data.isStudying) {
-        setVerificationResult({ success: true, message: data.reason || 'Verified!' });
-        addLogEntry('verified', formatTime(time));
-        setTimeout(() => {
-          setShowVerification(false);
-          setVerificationResult(null);
-        }, 2000);
+        if (!isSilent) {
+          setVerificationResult({ success: true, message: data.reason || 'Verified!' });
+          addLogEntry('verified', formatTime(time));
+          setTimeout(() => {
+            setShowVerification(false);
+            setVerificationResult(null);
+          }, 2000);
+        } else {
+          setLastNudge(null); // Clear any previous nudges if they are back on track
+        }
       } else {
-        setVerificationResult({ success: false, message: data.reason || data.error || 'Not studying.' });
-        addLogEntry('failed', formatTime(time));
+        if (!isSilent) {
+          setVerificationResult({ success: false, message: data.reason || data.error || 'Not studying.' });
+          addLogEntry('failed', formatTime(time));
+        } else {
+          // Silent Background Ping!
+          setLastNudge(data.reason || "Hey! It looks like you're off track. Let's get back to work!");
+          if (notificationSound.current) {
+            notificationSound.current.play().catch(() => {});
+          }
+        }
       }
     } catch (error) {
       console.error("Verification error", error);
-      setVerificationResult({ success: false, message: 'Analysis failed.' });
+      if (!isSilent) setVerificationResult({ success: false, message: 'Analysis failed.' });
     } finally {
-      setIsAnalyzing(false);
+      if (!isSilent) setIsAnalyzing(false);
     }
   }, [webcamRef, refAllowed, refRejected, time, addLogEntry, formatTime, trackingMode, currentGoal]);
 
@@ -242,6 +257,8 @@ export default function Home() {
   // Main Timer Logic
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
+    let bgScanInterval: NodeJS.Timeout | null = null;
+    
     if (isActive && !showVerification) {
       interval = setInterval(() => {
         setTime((prev) => {
@@ -255,9 +272,19 @@ export default function Home() {
           return nextTime;
         });
       }, 1000);
+
+      // Background "Digital Body Double" Scanning (Every 2 minutes)
+      if (trackingMode === 'screen' && screenStream) {
+        bgScanInterval = setInterval(() => {
+          captureAndVerify(true);
+        }, 60000); // 1 minute background scan
+      }
     }
-    return () => { if (interval) clearInterval(interval); };
-  }, [isActive, intervalMinutes, showVerification, user, syncTime, triggerVerification]);
+    return () => { 
+      if (interval) clearInterval(interval); 
+      if (bgScanInterval) clearInterval(bgScanInterval);
+    };
+  }, [isActive, intervalMinutes, showVerification, user, syncTime, triggerVerification, trackingMode, screenStream, captureAndVerify]);
 
   useEffect(() => {
     let countdown: NodeJS.Timeout | null = null;
@@ -359,6 +386,17 @@ export default function Home() {
       <div className="timer-display">
         {formatTime(time)}
       </div>
+
+      {lastNudge && (
+        <div className="status-badge status-error" style={{ marginBottom: '1.5rem', width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid var(--danger)', animation: 'pulse 2s infinite' }}>
+          <AlertCircle size={20} />
+          <div style={{ textAlign: 'left' }}>
+            <strong style={{ display: 'block', fontSize: '0.8rem' }}>AI NUDGE</strong>
+            {lastNudge}
+          </div>
+          <button onClick={() => setLastNudge(null)} style={{ background: 'transparent', padding: '0.2rem', color: 'var(--danger)' }}>×</button>
+        </div>
+      )}
 
       <div style={{ marginBottom: '2rem' }}>
         <input 
