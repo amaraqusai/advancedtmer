@@ -142,19 +142,30 @@ export default function Home() {
     if (trackingMode === 'camera' && webcamRef.current) {
       imageSrc = webcamRef.current.getScreenshot();
     } else if (trackingMode === 'screen' && screenVideoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = screenVideoRef.current.videoWidth;
-      canvas.height = screenVideoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(screenVideoRef.current, 0, 0, canvas.width, canvas.height);
-        imageSrc = canvas.toDataURL('image/jpeg');
+      const video = screenVideoRef.current;
+      console.log(`[Scan] Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
+      
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          imageSrc = canvas.toDataURL('image/jpeg');
+        }
+      } else {
+        console.warn("[Scan] Video not ready yet (0 dimensions)");
       }
     }
 
-    if (!imageSrc) return;
+    if (!imageSrc) {
+      console.warn("[Scan] No image captured, skipping scan.");
+      return;
+    }
 
     if (isSilent) {
+      console.log("[Scan] Background scan triggered...");
       setLastScanTime(new Date().toLocaleTimeString());
     } else {
       setIsAnalyzing(true);
@@ -261,6 +272,7 @@ export default function Home() {
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     let bgScanInterval: NodeJS.Timeout | null = null;
+    let initialScanTimeout: NodeJS.Timeout | null = null;
     
     if (isActive && !showVerification) {
       interval = setInterval(() => {
@@ -278,25 +290,22 @@ export default function Home() {
 
       // Background "Digital Body Double" Scanning
       if (trackingMode === 'screen' && screenStream) {
-        // Initial scan after 5 seconds
-        const initialScan = setTimeout(() => {
+        initialScanTimeout = setTimeout(() => {
           captureAndVerify(true);
         }, 5000);
 
         bgScanInterval = setInterval(() => {
           captureAndVerify(true);
-        }, 60000); // 1 minute background scan
-        
-        return () => {
-          if (interval) clearInterval(interval);
-          if (bgScanInterval) clearInterval(bgScanInterval);
-          clearTimeout(initialScan);
-        };
+        }, 60000);
+      } else if (trackingMode === 'camera') {
+        // Also background scan for camera if you want, but user specifically asked for screen.
       }
     }
+
     return () => { 
       if (interval) clearInterval(interval); 
       if (bgScanInterval) clearInterval(bgScanInterval);
+      if (initialScanTimeout) clearTimeout(initialScanTimeout);
     };
   }, [isActive, intervalMinutes, showVerification, user, syncTime, triggerVerification, trackingMode, screenStream, captureAndVerify]);
 

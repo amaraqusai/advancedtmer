@@ -8,6 +8,7 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 export async function POST(request: NextRequest) {
   try {
     if (!genAI) {
+      console.error("[AI Analyze] Gemini API key missing from process.env.GEMINI_API_KEY");
       return NextResponse.json(
         { error: 'Gemini API key is not configured.' },
         { status: 500 }
@@ -20,7 +21,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No image provided.' }, { status: 400 });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    // Try multiple model name variations to avoid 404
+    const modelName = 'gemini-1.5-flash';
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     // Build the multimodal prompt
     const isScreen = mode === 'screen';
