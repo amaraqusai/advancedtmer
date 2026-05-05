@@ -38,13 +38,13 @@ export async function POST(request: NextRequest) {
       
       Criteria for STUDYING (Screen):
       - The content on the screen MUST be related to: "${goal || 'General Studying'}".
-      - Educational websites, programming tools, or document editors showing active work on this goal.
-      - Specifically look for indicators that match the goal text.
+      - Educational websites, university portals (e.g., Haifa University, Moodle, MW26), programming tools, or document editors.
+      - IMPORTANT: If the goal mentions a specific site like "mw26", "moodle", or "portal", and you see that site, it is DEFINITELY STUDYING.
+      - Do NOT confuse study sites with games (e.g., don't mistake a portal for a game just because it has a name like "MW").
       
       Criteria for NOT STUDYING (Screen):
-      - Clear distractions: Video games, social media (Instagram, Twitter), shopping, or general entertainment.
+      - Clear distractions: Video games (Modern Warfare, Steam games, etc.), social media (Instagram, Twitter), shopping, or general entertainment.
       - YouTube is generally REJECTED unless the video title/content is EXPLICITLY educational and matches the goal: "${goal}".
-      - Any browsing content that has NO direct relation to the stated goal.
       ` : `
       CONTEXT: This is a photo of the student from their WEBCAM.
       
