@@ -26,13 +26,8 @@ interface Group {
 }
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('studyUser');
-      return saved ? JSON.parse(saved) : null;
-    }
-    return null;
-  });
+  const [hasMounted, setHasMounted] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [userNameInput, setUserNameInput] = useState('');
   const [group, setGroup] = useState<Group | null>(null);
   const [groupNameInput, setGroupNameInput] = useState('');
@@ -42,12 +37,7 @@ export default function Home() {
   const [time, setTime] = useState(0); 
   const [currentGoal, setCurrentGoal] = useState('');
   
-  const [trackingMode, setTrackingMode] = useState<'camera' | 'manual' | 'screen'>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('trackingMode') as 'camera' | 'manual' | 'screen') || 'camera';
-    }
-    return 'camera';
-  });
+  const [trackingMode, setTrackingMode] = useState<'camera' | 'manual' | 'screen'>('camera');
   const [showVerification, setShowVerification] = useState(false);
   const [intervalMinutes, setIntervalMinutes] = useState(60);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -59,14 +49,8 @@ export default function Home() {
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   
   // Reference Photos
-  const [refAllowed, setRefAllowed] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('refAllowed');
-    return null;
-  });
-  const [refRejected, setRefRejected] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('refRejected');
-    return null;
-  });
+  const [refAllowed, setRefAllowed] = useState<string | null>(null);
+  const [refRejected, setRefRejected] = useState<string | null>(null);
   const [isSettingRefs, setIsSettingRefs] = useState(false);
 
   // Verification Timeout Logic
@@ -217,10 +201,24 @@ export default function Home() {
   useEffect(() => {
     notificationSound.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     
-    if (user?.groupId) {
-      setTimeout(() => fetchGroup(user.groupId), 0);
-    }
-  }, [fetchGroup, user?.groupId]);
+    setTimeout(() => {
+      setHasMounted(true);
+      const savedUser = localStorage.getItem('studyUser');
+      if (savedUser) {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        fetchGroup(parsedUser.groupId);
+      }
+
+      const savedAllowed = localStorage.getItem('refAllowed');
+      const savedRejected = localStorage.getItem('refRejected');
+      if (savedAllowed) setRefAllowed(savedAllowed);
+      if (savedRejected) setRefRejected(savedRejected);
+
+      const savedMode = localStorage.getItem('trackingMode') as 'camera' | 'manual' | 'screen';
+      if (savedMode) setTrackingMode(savedMode);
+    }, 0);
+  }, [fetchGroup]);
 
   // Auto-capture in camera/screen mode when modal opens
   useEffect(() => {
@@ -323,6 +321,8 @@ export default function Home() {
       localStorage.setItem('studyUser', JSON.stringify(updatedUser));
     }
   };
+
+  if (!hasMounted) return null;
 
   if (!user) {
     return (
