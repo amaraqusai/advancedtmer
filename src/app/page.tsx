@@ -40,6 +40,7 @@ export default function Home() {
   
   const [isActive, setIsActive] = useState(false);
   const [time, setTime] = useState(0); 
+  const [currentGoal, setCurrentGoal] = useState('');
   
   const [trackingMode, setTrackingMode] = useState<'camera' | 'manual' | 'screen'>(() => {
     if (typeof window !== 'undefined') {
@@ -177,6 +178,7 @@ export default function Home() {
         body: JSON.stringify({ 
           image: imageSrc,
           mode: trackingMode,
+          goal: currentGoal,
           referenceAllowed: refAllowed,
           referenceRejected: refRejected
         }),
@@ -200,7 +202,7 @@ export default function Home() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [webcamRef, refAllowed, refRejected, time, addLogEntry, formatTime, trackingMode]);
+  }, [webcamRef, refAllowed, refRejected, time, addLogEntry, formatTime, trackingMode, currentGoal]);
 
   const handleManualVerify = useCallback(() => {
     addLogEntry('verified', formatTime(time));
@@ -356,6 +358,17 @@ export default function Home() {
       
       <div className="timer-display">
         {formatTime(time)}
+      </div>
+
+      <div style={{ marginBottom: '2rem' }}>
+        <input 
+          type="text" 
+          placeholder="What are you working on right now?" 
+          value={currentGoal} 
+          onChange={(e) => setCurrentGoal(e.target.value)}
+          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '2px solid var(--primary)', textAlign: 'center', fontSize: '1.1rem', fontWeight: 500 }}
+        />
+        <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', opacity: 0.7 }}>The AI will monitor your {trackingMode === 'screen' ? 'screen' : 'camera'} specifically for this goal.</p>
       </div>
 
       <div className="controls">

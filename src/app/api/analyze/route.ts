@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { image, mode, referenceAllowed, referenceRejected } = await request.json();
+    const { image, mode, goal, referenceAllowed, referenceRejected } = await request.json();
 
     if (!image) {
       return NextResponse.json({ error: 'No image provided.' }, { status: 400 });
@@ -25,38 +25,38 @@ export async function POST(request: NextRequest) {
     // Build the multimodal prompt
     const isScreen = mode === 'screen';
     const promptParts: (string | { inlineData: { data: string; mimeType: string } })[] = [
-      `You are an AI study supervisor. Your job is to determine if the "Current Image" shows the student studying or working.
+      `You are an AI study supervisor acting as a "Digital Body Double" for a student with ADHD. 
+      Your job is to determine if the "Current Image" shows the student successfully working on their specific goal.
+      
+      STUDENT'S STATED GOAL: "${goal || 'General Studying'}"
       
       ${isScreen ? `
       CONTEXT: This is a screenshot of the student's COMPUTER SCREEN.
       
       Criteria for STUDYING (Screen):
-      - Educational websites (e.g., Moodle, university portals, research papers).
-      - SPECIFICALLY ALLOWED: Haifa University portal (huids.haifa.ac.il), slides, or academic PDF/documents.
-      - Programming IDEs (VS Code, etc.), design tools, or document editors (Word, Excel) if they look like work.
-      - Search queries related to learning or technical problems.
+      - The content on the screen MUST be related to: "${goal || 'General Studying'}".
+      - Educational websites, programming tools, or document editors showing active work on this goal.
+      - Specifically look for indicators that match the goal text.
       
       Criteria for NOT STUDYING (Screen):
-      - Video games (e.g., Steam, Fortnite, Minecraft, or casual web games).
-      - Social media (Facebook, Instagram, TikTok, etc.) unless clearly for work.
-      - Streaming entertainment (Netflix, YouTube entertainment videos).
-      - Clear non-work/non-study browsing.
+      - Clear distractions: Video games, social media, shopping, or entertainment videos.
+      - Browsing content that has NO relation to the stated goal.
       ` : `
       CONTEXT: This is a photo of the student from their WEBCAM.
       
       Criteria for STUDYING (Webcam):
-      - Student is present in the frame.
-      - Student is looking at a computer screen, books, or writing.
-      - Student appears focused and engaged with study materials.
+      - Student is present and focused on the screen or paper.
+      - Their posture and activity suggest they are working on: "${goal || 'General Studying'}".
       
       Criteria for NOT STUDYING (Webcam):
-      - Student is missing from the frame (empty chair).
-      - Student is sleeping or has eyes closed.
-      - Student is clearly using a phone for entertainment.
-      - Student is looking away from their work for an extended period.
+      - Student is missing, sleeping, or playing on a phone.
+      - Student looks completely disengaged from the task.
       `}
       
-      Use your general knowledge of study behavior and screen content to decide.`,
+      BEHAVIORAL NUDGE:
+      If they are NOT studying, your "reason" should be a supportive but firm ADHD-friendly nudge (e.g., "It looks like you got distracted by YouTube. Let's get back to [Goal]!").
+      
+      Respond ONLY with a JSON object: {"isStudying": boolean, "reason": "short explanation/nudge"}.`,
     ];
 
     if (referenceAllowed) {
