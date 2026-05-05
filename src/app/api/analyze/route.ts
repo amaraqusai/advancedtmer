@@ -39,8 +39,9 @@ export async function POST(request: NextRequest) {
       - Specifically look for indicators that match the goal text.
       
       Criteria for NOT STUDYING (Screen):
-      - Clear distractions: Video games, social media, shopping, or entertainment videos.
-      - Browsing content that has NO relation to the stated goal.
+      - Clear distractions: Video games, social media (Instagram, Twitter), shopping, or general entertainment.
+      - YouTube is generally REJECTED unless the video title/content is EXPLICITLY educational and matches the goal: "${goal}".
+      - Any browsing content that has NO direct relation to the stated goal.
       ` : `
       CONTEXT: This is a photo of the student from their WEBCAM.
       
@@ -89,15 +90,16 @@ export async function POST(request: NextRequest) {
 
     promptParts.push('Respond ONLY with a JSON object: {"isStudying": boolean, "reason": "short explanation"}.');
 
+    console.log(`[AI Analyze] Mode: ${mode}, Goal: ${goal || 'None'}`);
     const result = await model.generateContent(promptParts);
     const responseText = result.response.text();
     
     // Parse the JSON response
-    // Sometimes the model wraps JSON in markdown block like ```json ... ```
     let parsedResponse = { isStudying: false, reason: "Could not analyze the image properly." };
     try {
       const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
       parsedResponse = JSON.parse(cleanJson);
+      console.log(`[AI Decision] Studying: ${parsedResponse.isStudying}, Reason: ${parsedResponse.reason}`);
     } catch (parseError) {
       console.error("Failed to parse AI response:", responseText, parseError);
       // Fallback: simple text match

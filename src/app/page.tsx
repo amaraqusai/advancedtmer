@@ -44,6 +44,7 @@ export default function Home() {
   const [verificationResult, setVerificationResult] = useState<{success: boolean, message: string} | null>(null);
   const [studyLog, setStudyLog] = useState<LogEntry[]>([]);
   const [lastNudge, setLastNudge] = useState<string | null>(null);
+  const [lastScanTime, setLastScanTime] = useState<string | null>(null);
   
   // Screen Capture Stream
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -153,7 +154,9 @@ export default function Home() {
 
     if (!imageSrc) return;
 
-    if (!isSilent) {
+    if (isSilent) {
+      setLastScanTime(new Date().toLocaleTimeString());
+    } else {
       setIsAnalyzing(true);
       setVerificationResult(null);
     }
@@ -407,6 +410,11 @@ export default function Home() {
           style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '2px solid var(--primary)', textAlign: 'center', fontSize: '1.1rem', fontWeight: 500 }}
         />
         <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', opacity: 0.7 }}>The AI will monitor your {trackingMode === 'screen' ? 'screen' : 'camera'} specifically for this goal.</p>
+        {lastScanTime && trackingMode !== 'manual' && (
+          <p style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600 }}>
+            Digital Body Double is active. Last scan: {lastScanTime}
+          </p>
+        )}
       </div>
 
       <div className="controls">
