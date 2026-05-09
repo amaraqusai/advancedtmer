@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No image provided.' }, { status: 400 });
     }
 
-    // Use gemini-1.5-flash-latest which is more stable for v1beta
-    const modelName = 'gemini-1.5-flash-latest';
+    // Use gemini-flash-latest as the old 1.5 models are no longer available on this API key
+    const modelName = 'gemini-flash-latest';
     const model = genAI.getGenerativeModel({ model: modelName });
 
     // Build the multimodal prompt

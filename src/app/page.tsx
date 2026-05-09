@@ -101,10 +101,10 @@ export default function Home() {
       await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, additionalSeconds: seconds }),
+        body: JSON.stringify({ userId, studySecs: seconds, subject: currentGoal || 'Other' }),
       });
     } catch (e) { console.error("Sync failed", e); }
-  }, []);
+  }, [currentGoal]);
 
   const triggerVerification = useCallback(() => {
     if (notificationSound.current) {
@@ -512,7 +512,7 @@ export default function Home() {
                 <button onClick={stopScreenShare} style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}>Stop</button>
               </div>
             )}
-            <video ref={screenVideoRef} autoPlay playsInline muted style={{ display: 'none' }} />
+            <video ref={screenVideoRef} autoPlay playsInline muted style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: '1px', height: '1px' }} />
           </div>
         )}
 

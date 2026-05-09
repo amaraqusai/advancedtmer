@@ -11,21 +11,79 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(uuid())
-  name              String
+  id                String        @id @default(uuid())
+  name              String        @unique
   groupId           String?
-  group             Group?   @relation(fields: [groupId], references: [id])
-  totalStudySeconds Int      @default(0)
-  lastSync          DateTime @default(now())
+  group             Group?        @relation(fields: [groupId], references: [id])
+  totalStudySeconds Int           @default(0)
+  totalBreakSeconds Int           @default(0)
+  lastSync          DateTime      @default(now())
+
+  // Goal / streak tracking (mirrors Python's goal_amount)
+  goalsReached      Int           @default(0)
+  currentGoalSecs   Int           @default(3600) // default: 1 hour in seconds
+  lastStudyDate     String?       // ISO date string "YYYY-MM-DD" of last session
+
+  // Day-of-week accumulated seconds (mirrors Python's W2..W8 cells)
+  mondaySecs        Int           @default(0)
+  tuesdaySecs       Int           @default(0)
+  wednesdaySecs     Int           @default(0)
+  thursdaySecs      Int           @default(0)
+  fridaySecs        Int           @default(0)
+  saturdaySecs      Int           @default(0)
+  sundaySecs        Int           @default(0)
+
+  // Preferences (mirrors Python's settings panel)
+  subject           String        @default("Other")
+  colorTheme        String        @default("Orange") // Orange | Green | Blue | Pink
+  uiTheme           String        @default("Dark")   // Dark | Light
+  eyeCareOn         Boolean       @default(false)
+  eyeCareTimerOnly  Boolean       @default(false)
+  autoBreakOn       Boolean       @default(false)
+  autoBreakFreqMins Int           @default(25)
+  autoBreakDurMins  Int           @default(5)
+
   sessions          StudySession[]
+  notes             Note[]
+  achievements      UserAchievement[]
 }
 
 model StudySession {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  startedAt   DateTime
+  endedAt     DateTime
+  duration    Int      // study seconds
+  breakSecs   Int      @default(0)
+  subject     String   @default("Other")
+  goalReached Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Note {
   id        String   @id @default(uuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  duration  Int      // in seconds
+  title     String
+  text      String
+  deleted   Boolean  @default(false)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Mirrors Python's Achievement class with per-user progress
+model UserAchievement {
+  id       String @id @default(uuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  name     String // e.g. "Time Titan"
+  title    String // description
+  value    Int    @default(0)
+  maxValue Int
+  unlocked Boolean @default(false)
+
+  @@unique([userId, name])
 }
 
 model Group {
