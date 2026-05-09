@@ -17,6 +17,15 @@ model User {
   group             Group?   @relation(fields: [groupId], references: [id])
   totalStudySeconds Int      @default(0)
   lastSync          DateTime @default(now())
+  sessions          StudySession[]
+}
+
+model StudySession {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  duration  Int      // in seconds
+  createdAt DateTime @default(now())
 }
 
 model Group {

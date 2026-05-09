@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Play, Pause, Square, Camera, Loader2, CheckCircle2, AlertCircle, History, Bell, Settings2, Users, Trophy, User as UserIcon } from 'lucide-react';
+import Link from 'next/link';
+import { Play, Pause, Square, Camera, Loader2, CheckCircle2, AlertCircle, History, Bell, Settings2, Users, Trophy, User as UserIcon, BarChart3 } from 'lucide-react';
 
 interface LogEntry {
   id: string;
@@ -195,28 +196,35 @@ export default function Home() {
       });
 
       const data = await response.json();
-      if (response.ok && data.isStudying) {
-        if (!isSilent) {
-          setVerificationResult({ success: true, message: data.reason || 'Verified!' });
-          addLogEntry('verified', formatTime(timeRef.current));
-          setTimeout(() => {
-            setShowVerification(false);
-            setVerificationResult(null);
-          }, 2000);
+      if (response.ok) {
+        if (data.isStudying) {
+          if (!isSilent) {
+            setVerificationResult({ success: true, message: data.reason || 'Verified!' });
+            addLogEntry('verified', formatTime(timeRef.current));
+            setTimeout(() => {
+              setShowVerification(false);
+              setVerificationResult(null);
+            }, 2000);
+          } else {
+            setLastNudge(null); // Clear any previous nudges if they are back on track
+          }
         } else {
-          setLastNudge(null); // Clear any previous nudges if they are back on track
-        }
-      } else {
-        if (!isSilent) {
-          setVerificationResult({ success: false, message: data.reason || data.error || 'Not studying.' });
-          addLogEntry('failed', formatTime(timeRef.current));
-        } else {
-          // Silent Background Ping!
-          setLastNudge(data.reason || "Hey! It looks like you're off track. Let's get back to work!");
-          if (notificationSound.current) {
-            notificationSound.current.play().catch(() => {});
+          // Explicitly not studying
+          if (!isSilent) {
+            setVerificationResult({ success: false, message: data.reason || 'Not studying.' });
+            addLogEntry('failed', formatTime(timeRef.current));
+          } else {
+            // Silent Background Ping!
+            setLastNudge(data.reason || "Hey! It looks like you're off track. Let's get back to work!");
+            if (notificationSound.current) {
+              notificationSound.current.play().catch(() => {});
+            }
           }
         }
+      } else {
+        // API error - do NOT nudge the user for a technical failure
+        console.error("AI Analysis API error:", data.error);
+        if (!isSilent) setVerificationResult({ success: false, message: 'Analysis unavailable.' });
       }
     } catch (error) {
       console.error("Verification error", error);
@@ -577,10 +585,14 @@ export default function Home() {
         </div>
       ) : (
         <div className="leaderboard">
-          <h3>
-            <span><Trophy size={18} style={{verticalAlign: 'middle', marginRight: '8px'}}/> {group.name}</span>
-            <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Code: {group.inviteCode}</span>
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0 }}>
+              <span><Trophy size={18} style={{verticalAlign: 'middle', marginRight: '8px'}}/> {group.name}</span>
+            </h3>
+            <Link href="/stats" className="secondary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+              <BarChart3 size={16} /> View Group Stats
+            </Link>
+          </div>
           <div className="invite-box">Invite friends using code: {group.inviteCode}</div>
           <div className="leaderboard-list">
             {group.members.map((member, i) => (
@@ -616,7 +628,7 @@ export default function Home() {
             {trackingMode === 'camera' ? (
               <>
                 <div className="webcam-container" style={{ marginTop: '1rem' }}><Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" /></div>
-                <button className="primary" onClick={captureAndVerify} disabled={isAnalyzing || (verificationResult?.success)} style={{ width: '100%', marginBottom: '1rem' }}>
+                <button className="primary" onClick={() => captureAndVerify()} disabled={isAnalyzing || (verificationResult?.success)} style={{ width: '100%', marginBottom: '1rem' }}>
                   {isAnalyzing ? <><Loader2 className="spinner" size={20} /> AI is deciding...</> : <><Camera size={20} /> Capture Now</>}
                 </button>
                 {!isAnalyzing && !verificationResult && <p style={{ fontSize: '0.8rem', marginTop: '-0.5rem' }}>Auto-capturing in a moment...</p>}
@@ -638,7 +650,7 @@ export default function Home() {
                     <div style={{ color: '#666' }}>Screen sharing not active</div>
                   )}
                 </div>
-                <button className="primary" onClick={captureAndVerify} disabled={isAnalyzing || (verificationResult?.success) || !screenStream} style={{ width: '100%', marginBottom: '1rem' }}>
+                <button className="primary" onClick={() => captureAndVerify()} disabled={isAnalyzing || (verificationResult?.success) || !screenStream} style={{ width: '100%', marginBottom: '1rem' }}>
                   {isAnalyzing ? <><Loader2 className="spinner" size={20} /> AI Scanning Screen...</> : <><History size={20} /> Scan Screen Now</>}
                 </button>
                 {!isAnalyzing && !verificationResult && screenStream && <p style={{ fontSize: '0.8rem', marginTop: '-0.5rem' }}>Scanning in a moment...</p>}

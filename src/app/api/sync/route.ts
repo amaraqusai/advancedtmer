@@ -7,15 +7,23 @@ export async function POST(request: NextRequest) {
 
     if (!userId) return NextResponse.json({ error: 'UserId required' }, { status: 400 });
 
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        totalStudySeconds: { increment: additionalSeconds },
-        lastSync: new Date()
-      }
-    });
+    const user = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          totalStudySeconds: { increment: additionalSeconds },
+          lastSync: new Date()
+        }
+      }),
+      prisma.studySession.create({
+        data: {
+          userId,
+          duration: additionalSeconds
+        }
+      })
+    ]);
 
-    return NextResponse.json(user);
+    return NextResponse.json(user[0]);
   } catch (error) {
     console.error('Sync error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No image provided.' }, { status: 400 });
     }
 
-    // Try multiple model name variations to avoid 404
-    const modelName = 'gemini-1.5-flash';
+    // Use gemini-1.5-flash-latest which is more stable for v1beta
+    const modelName = 'gemini-1.5-flash-latest';
     const model = genAI.getGenerativeModel({ model: modelName });
 
     // Build the multimodal prompt
@@ -38,12 +38,15 @@ export async function POST(request: NextRequest) {
       
       Criteria for STUDYING (Screen):
       - The content on the screen MUST be related to: "${goal || 'General Studying'}".
-      - Educational websites, university portals (e.g., Haifa University, Moodle, MW26), programming tools, or document editors.
-      - IMPORTANT: If the goal mentions a specific site like "mw26", "moodle", or "portal", and you see that site, it is DEFINITELY STUDYING.
-      - Do NOT confuse study sites with games (e.g., don't mistake a portal for a game just because it has a name like "MW").
+      - Educational websites and University portals are DEFINITELY ALLOWED.
+      - SPECIFICALLY ALLOWED: Any site ending in ".haifa.ac.il", including "mw26.haifa.ac.il" (Moodle) and "https://mw26.haifa.ac.il/my/courses.php".
+      - IMPORTANT: "mw26" is a University Moodle portal. Do NOT confuse it with "Modern Warfare" or other games.
+      - Programming tools (VS Code), document editors, or Moodle are also allowed.
+      - If you see any university logos, course lists, or academic content from Haifa University, it is STUDYING.
       
       Criteria for NOT STUDYING (Screen):
-      - Clear distractions: Video games (Modern Warfare, Steam games, etc.), social media (Instagram, Twitter), shopping, or general entertainment.
+      - Clear distractions: Video games (Steam games, etc.), social media (Instagram, Twitter), shopping, or general entertainment.
+      - NOTE: "Modern Warfare" (MW) is a game, but "mw26.haifa.ac.il" is a UNIVERSITY SITE. Use context to distinguish.
       - YouTube is generally REJECTED unless the video title/content is EXPLICITLY educational and matches the goal: "${goal}".
       ` : `
       CONTEXT: This is a photo of the student from their WEBCAM.
